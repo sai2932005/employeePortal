@@ -5,6 +5,7 @@ let tokenExpiresAt=  0 ;
 
 const getZohoAccessToken  = async()=>{
 
+
     const now = Date.now() ;
     if(cachedToken && now < tokenExpiresAt){
         return cachedToken ; 
@@ -42,4 +43,28 @@ const ZOHO_APP_MAP = {
     access_zoho_books : {name: "Zoho Books" , url: process.env.ZOHO_BOOKS_URL}
 }
 
-module.exports = {getZohoAccessToken, ZOHO_APP_MAP};
+
+
+async function fetchZohoData(appKey) {
+  const accessToken = await getZohoAccessToken();
+
+  // Real Zoho REST API calls, authenticated with our service-account token.
+  // Only CRM is wired up as the proof-of-pattern; extending to People/Desk/Books
+  // follows the same shape, just different endpoints per Zoho's API docs.
+
+  if (appKey === 'access_zoho_crm') {
+    const response = await axios.get(
+      `${process.env.ZOHO_API_BASE_URL}/crm/v3/Leads`,
+      {
+        headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
+        params: { fields: 'Last_Name,Company,Email,Lead_Status' },
+      }
+    );
+    return response.data.data || [];
+  }
+
+
+  throw new Error(`Live data fetch not implemented for ${appKey}`);
+}
+
+module.exports = {getZohoAccessToken, ZOHO_APP_MAP , fetchZohoData };

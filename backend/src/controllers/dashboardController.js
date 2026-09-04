@@ -1,4 +1,4 @@
-const {ZOHO_APP_MAP, getZohoAccessToken} = require("../services/zohoService"); 
+const {ZOHO_APP_MAP, getZohoAccessToken , fetchZohoData} = require("../services/zohoService"); 
 
 const {logAction} = require("../services/auditService");
 
@@ -18,38 +18,38 @@ const getMyApps =  (req,res)=>{
 } 
 
 
+const accessZohoApp = async(req, res)=> {
+  const { appKey } = req.params;
+  const app = ZOHO_APP_MAP[appKey];
+  if (!app) return res.status(404).json({ message: 'Unknown Zoho app' });
 
-const accessZohoApp = async (req,res)=>{
+  try {
+    let data = null;
+    let liveDataAvailable = false;
 
-    const {appKey} = req.params ;
-    const app = ZOHO_APP_MAP[appKey] ;
-    if(!app) return res.status(404).json({message: "App not found"}) ;
-
-    try{
-        const accessToken = await getZohoAccessToken() ; 
-
-        await logAction({
-            userId : req.user.id ,
-            action : `ACCESS_${appKey.toUpperCase()}`,
-            details : `${req.user.email} accessed ${app.name}`,
-            ipAdress : req.ip
-
-        });
-
-        res.json({
-            message : `Access granted to ${app.name}`,
-            redirectedUrl :app.url ,
-            tokenAcquired : Boolean(accessToken) 
-
-        }) ; 
-
-    }catch(err){
-        res.status(502).json({message: "Failed to reach Zoho",error :err.message}) ;
-
+    try {
+      data = await fetchZohoData(appKey);
+      liveDataAvailable = true;
+    } catch (fetchErr) {
+      console.warn(`No live fetch for ${appKey}:`, fetchErr.message);
     }
 
+    await logAction({
+      userId: req.user.id,
+      action: `ACCESS_${appKey.toUpperCase()}`,
+      details: `${req.user.email} accessed ${app.name}`,
+      ipAddress: req.ip,
+    });
 
-
+    res.json({
+      message: `Access granted to ${app.name}`,
+      appName: app.name,
+      liveDataAvailable,
+      data, // real Zoho records when available, null otherwise
+    });
+  } catch (err) {
+    res.status(502).json({ message: 'Failed to reach Zoho', error: err.message });
+  }
 }
 
 module.exports= {getMyApps, accessZohoApp} ;
